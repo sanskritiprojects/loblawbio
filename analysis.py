@@ -4,7 +4,6 @@
 
 import sqlite3
 from pathlib import Path
-
 import pandas as pd
 from scipy.stats import mannwhitneyu
 
@@ -14,7 +13,6 @@ from scipy.stats import mannwhitneyu
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "cell_counts.db"
-
 POPULATIONS = ["b_cell", "cd8_t_cell", "cd4_t_cell", "nk_cell", "monocyte"]
 
 ######################################################
@@ -99,3 +97,40 @@ def get_miraclib_pbmc_melanoma_summary():
         & (summary["sample_type"] == "PBMC")
         & (summary["response"].isin(["yes", "no"]))
     ].copy()
+
+### responder comparison
+def compare_responders_vs_nonresponders():
+    data = get_miraclib_pbmc_melanoma_summary()
+
+    results = []
+
+    for population in POPULATIONS:
+        responders = data[
+            (data["population"] == population) & (data["response"] == "yes")
+        ]["percentage"]
+
+        nonresponders = data[
+            (data["population"] == population) & (data["response"] == "no")
+        ]["percentage"]
+
+        test = mannwhitneyu(
+            responders,
+            nonresponders,
+            alternative="two-sided",
+            method="auto",
+        )
+
+        results.append(
+            {
+                "population": population,
+                "n_responders": len(responders),
+                "n_nonresponders": len(nonresponders),
+                "median_responders": responders.median(),
+                "median_nonresponders": nonresponders.median(),
+                "u_statistic": test.statistic,
+                "p_value": test.pvalue,
+                "significant_at_0.05": test.pvalue < 0.05,
+            }
+        )
+
+    return pd.DataFrame(results)
