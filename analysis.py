@@ -89,3 +89,13 @@ def get_summary_table():
         ]
     ]
 
+### melanoma summary
+def get_miraclib_pbmc_melanoma_summary():
+    summary = get_summary_table()
+
+    return summary[
+        (summary["condition"] == "melanoma")
+        & (summary["treatment"] == "miraclib")
+        & (summary["sample_type"] == "PBMC")
+        & (summary["response"].isin(["yes", "no"]))
+    ].copy()
