@@ -1,0 +1,2 @@
+population,n_responders,n_nonresponders,median_responders,median_nonresponders,u_statistic,p_value,significant_at_0.05
+cd4_t_cell,993,975,30.22056448672133,29.65760700451731,515276.0,0.013344218813937624,True

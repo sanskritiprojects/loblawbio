@@ -2,16 +2,16 @@
 ### imports
 ######################################################
 
-import plotly.express as px
 import streamlit as st
 
 from analysis import (
-    get_summary_table,
-    get_miraclib_pbmc_melanoma_summary,
+    SUMMARY_OUTPUT_COLUMNS,
+    build_responder_comparison_boxplot,
     compare_responders_vs_nonresponders,
+    get_average_b_cells_melanoma_male_responders_baseline,
     get_baseline_miraclib_melanoma_pbmc_samples,
     get_baseline_subset_counts,
-    get_average_b_cells_melanoma_male_responders_baseline,
+    get_summary_table,
 )
 
 
@@ -38,19 +38,11 @@ with tab1:
 
     summary = get_summary_table()
 
-    display_columns = [
-        "sample",
-        "total_count",
-        "population",
-        "count",
-        "percentage",
-    ]
-
-    st.dataframe(summary[display_columns], use_container_width=True)
+    st.dataframe(summary[SUMMARY_OUTPUT_COLUMNS], use_container_width=True)
 
     st.download_button(
         label="Download summary table as CSV",
-        data=summary[display_columns].to_csv(index=False),
+        data=summary[SUMMARY_OUTPUT_COLUMNS].to_csv(index=False),
         file_name="cell_population_summary.csv",
         mime="text/csv",
     )
@@ -59,22 +51,8 @@ with tab1:
 with tab2:
     st.header("Melanoma PBMC samples treated with miraclib")
 
-    data = get_miraclib_pbmc_melanoma_summary()
     stats = compare_responders_vs_nonresponders()
-
-    fig = px.box(
-        data,
-        x="population",
-        y="percentage",
-        color="response",
-        points="outliers",
-        labels={
-            "population": "Cell population",
-            "percentage": "Relative frequency (%)",
-            "response": "Response",
-        },
-        title="Relative frequencies by response group",
-    )
+    fig = build_responder_comparison_boxplot()
 
     st.plotly_chart(fig, use_container_width=True)
 

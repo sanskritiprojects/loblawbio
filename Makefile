@@ -5,7 +5,7 @@ setup:
 
 pipeline:
 	python load_data.py
-	python analysis.py
+	python run_pipeline.py
 
 dashboard:
 	streamlit run dashboard.py
