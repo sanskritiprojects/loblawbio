@@ -134,3 +134,43 @@ def compare_responders_vs_nonresponders():
         )
 
     return pd.DataFrame(results)
+
+## baselines
+def get_baseline_miraclib_melanoma_pbmc_samples():
+    query = """
+    SELECT *
+    FROM cell_counts
+    WHERE condition = 'melanoma'
+      AND treatment = 'miraclib'
+      AND sample_type = 'PBMC'
+      AND time_from_treatment_start = 0;
+    """
+
+    with get_connection() as conn:
+        return pd.read_sql_query(query, conn)
+
+
+def get_baseline_subset_counts():
+    baseline = get_baseline_miraclib_melanoma_pbmc_samples()
+
+    samples_by_project = (
+        baseline.groupby("project")["sample"]
+        .nunique()
+        .reset_index(name="sample_count")
+    )
+
+    subjects_by_response = (
+        baseline.drop_duplicates("subject")
+        .groupby("response")["subject"]
+        .nunique()
+        .reset_index(name="subject_count")
+    )
+
+    subjects_by_sex = (
+        baseline.drop_duplicates("subject")
+        .groupby("sex")["subject"]
+        .nunique()
+        .reset_index(name="subject_count")
+    )
+
+    return samples_by_project, subjects_by_response, subjects_by_sex
