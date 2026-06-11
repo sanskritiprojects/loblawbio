@@ -16,6 +16,36 @@ from scipy.stats import mannwhitneyu
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "cell_counts.db"
 POPULATIONS = ["b_cell", "cd8_t_cell", "cd4_t_cell", "nk_cell", "monocyte"]
+POPULATION_LABELS = {
+    "b_cell": "B cell",
+    "cd8_t_cell": "CD8+ T cell",
+    "cd4_t_cell": "CD4+ T cell",
+    "nk_cell": "NK cell",
+    "monocyte": "Monocyte",
+}
+POPULATION_COLORS = {
+    "b_cell": "#1B4965",
+    "cd8_t_cell": "#62B6CB",
+    "cd4_t_cell": "#EE6C4D",
+    "nk_cell": "#5A189A",
+    "monocyte": "#2A9D8F",
+}
+RESPONSE_COLORS = {
+    "yes": "#2A9D8F",
+    "no": "#E76F51",
+}
+RESPONSE_LABELS = {
+    "yes": "Responder",
+    "no": "Non-responder",
+}
+SEX_COLORS = {
+    "M": "#264653",
+    "F": "#E9C46A",
+}
+PROJECT_COLORS = {
+    "prj1": "#1B4965",
+    "prj3": "#62B6CB",
+}
 SUMMARY_OUTPUT_COLUMNS = [
     "sample",
     "total_count",
@@ -31,6 +61,25 @@ OUTPUT_DIR = ROOT / "outputs"
 
 def get_connection():
     return sqlite3.connect(DB_PATH)
+
+
+def _label_populations(df: pd.DataFrame, column: str = "population") -> pd.DataFrame:
+    labeled = df.copy()
+    labeled[column] = labeled[column].map(POPULATION_LABELS).fillna(labeled[column])
+    return labeled
+
+
+def _apply_chart_theme(fig):
+    fig.update_layout(
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        font={"family": "Arial, sans-serif", "color": "#293241", "size": 13},
+        legend={"title": ""},
+        margin={"t": 60, "r": 20, "b": 40, "l": 40},
+    )
+    fig.update_xaxes(showgrid=False, linecolor="#D9D9D9")
+    fig.update_yaxes(gridcolor="#EDEDED", linecolor="#D9D9D9")
+    return fig
 
 def get_summary_table():
     query = """
@@ -146,22 +195,285 @@ def compare_responders_vs_nonresponders():
     return pd.DataFrame(results)
 
 
-def build_responder_comparison_boxplot():
-    data = get_miraclib_pbmc_melanoma_summary()
+def build_mean_frequency_barplot(summary: pd.DataFrame | None = None):
+    if summary is None:
+        summary = get_summary_table()
 
-    return px.box(
-        data,
+    mean_freq = (
+        summary.groupby("population", observed=True)["percentage"]
+        .mean()
+        .reindex(POPULATIONS)
+        .reset_index()
+    )
+    mean_freq = _label_populations(mean_freq)
+
+    fig = px.bar(
+        mean_freq,
         x="population",
         y="percentage",
-        color="response",
-        points="outliers",
+        labels={
+            "population": "Cell population",
+            "percentage": "Mean relative frequency (%)",
+        },
+        title="Mean relative frequency by cell population",
+    )
+    fig.update_traces(
+        marker_color=[POPULATION_COLORS[p] for p in POPULATIONS],
+        showlegend=False,
+    )
+    return _apply_chart_theme(fig)
+
+
+def build_population_distribution_violin(summary: pd.DataFrame | None = None):
+    if summary is None:
+        summary = get_summary_table()
+
+    plot_data = _label_populations(summary.copy())
+    plot_data["population"] = pd.Categorical(
+        plot_data["population"],
+        categories=[POPULATION_LABELS[p] for p in POPULATIONS],
+        ordered=True,
+    )
+
+    fig = px.violin(
+        plot_data,
+        x="population",
+        y="percentage",
+        color="population",
+        box=True,
+        points=False,
         labels={
             "population": "Cell population",
             "percentage": "Relative frequency (%)",
-            "response": "Response",
+        },
+        title="Distribution of relative frequencies across samples",
+        color_discrete_map={
+            POPULATION_LABELS[p]: POPULATION_COLORS[p] for p in POPULATIONS
+        },
+    )
+    fig.update_layout(showlegend=False)
+    return _apply_chart_theme(fig)
+
+
+def build_responder_comparison_boxplot():
+    data = get_miraclib_pbmc_melanoma_summary().copy()
+    data["population_label"] = pd.Categorical(
+        data["population"].map(POPULATION_LABELS),
+        categories=[POPULATION_LABELS[p] for p in POPULATIONS],
+        ordered=True,
+    )
+    data["response_label"] = data["response"].map(RESPONSE_LABELS)
+
+    fig = px.box(
+        data,
+        x="population_label",
+        y="percentage",
+        color="response_label",
+        points="outliers",
+        category_orders={
+            "population_label": [POPULATION_LABELS[p] for p in POPULATIONS],
+            "response_label": list(RESPONSE_LABELS.values()),
+        },
+        labels={
+            "population_label": "Cell population",
+            "percentage": "Relative frequency (%)",
+            "response_label": "Response",
         },
         title="Relative frequencies by response group",
+        color_discrete_map={
+            RESPONSE_LABELS["yes"]: RESPONSE_COLORS["yes"],
+            RESPONSE_LABELS["no"]: RESPONSE_COLORS["no"],
+        },
     )
+    return _apply_chart_theme(fig)
+
+
+def build_responder_median_comparison_barplot(stats: pd.DataFrame | None = None):
+    if stats is None:
+        stats = compare_responders_vs_nonresponders()
+
+    plot_data = stats[["population", "median_responders", "median_nonresponders"]].copy()
+    plot_data = plot_data.melt(
+        id_vars="population",
+        value_vars=["median_responders", "median_nonresponders"],
+        var_name="group",
+        value_name="median_percentage",
+    )
+    plot_data["response_label"] = plot_data["group"].map(
+        {
+            "median_responders": RESPONSE_LABELS["yes"],
+            "median_nonresponders": RESPONSE_LABELS["no"],
+        }
+    )
+    plot_data["population_label"] = pd.Categorical(
+        plot_data["population"].map(POPULATION_LABELS),
+        categories=[POPULATION_LABELS[p] for p in POPULATIONS],
+        ordered=True,
+    )
+
+    fig = px.bar(
+        plot_data,
+        x="population_label",
+        y="median_percentage",
+        color="response_label",
+        barmode="group",
+        category_orders={
+            "population_label": [POPULATION_LABELS[p] for p in POPULATIONS],
+            "response_label": list(RESPONSE_LABELS.values()),
+        },
+        labels={
+            "population_label": "Cell population",
+            "median_percentage": "Median relative frequency (%)",
+            "response_label": "Response",
+        },
+        title="Median relative frequency: responders vs non-responders",
+        color_discrete_map={
+            RESPONSE_LABELS["yes"]: RESPONSE_COLORS["yes"],
+            RESPONSE_LABELS["no"]: RESPONSE_COLORS["no"],
+        },
+    )
+    return _apply_chart_theme(fig)
+
+
+def build_pvalue_barplot(stats: pd.DataFrame | None = None):
+    if stats is None:
+        stats = compare_responders_vs_nonresponders()
+
+    plot_data = stats.copy()
+    plot_data["population_label"] = pd.Categorical(
+        plot_data["population"].map(POPULATION_LABELS),
+        categories=[POPULATION_LABELS[p] for p in POPULATIONS],
+        ordered=True,
+    )
+    plot_data["significance"] = plot_data["significant_at_0.05"].map(
+        {True: "Significant", False: "Not significant"}
+    )
+
+    fig = px.bar(
+        plot_data,
+        x="population_label",
+        y="p_value",
+        color="significance",
+        labels={
+            "population_label": "Cell population",
+            "p_value": "p-value",
+            "significance": "Result",
+        },
+        title="Statistical significance by cell population",
+        color_discrete_map={
+            "Significant": RESPONSE_COLORS["yes"],
+            "Not significant": "#BDBDBD",
+        },
+    )
+    fig.add_hline(
+        y=0.05,
+        line_dash="dash",
+        line_color="#E76F51",
+        annotation_text="p = 0.05",
+        annotation_position="top right",
+    )
+    return _apply_chart_theme(fig)
+
+
+def build_baseline_project_barplot(samples_by_project: pd.DataFrame):
+    fig = px.bar(
+        samples_by_project,
+        x="project",
+        y="sample_count",
+        text="sample_count",
+        labels={"project": "Project", "sample_count": "Sample count"},
+        title="Baseline samples by project",
+        color="project",
+        color_discrete_map=PROJECT_COLORS,
+    )
+    fig.update_traces(textposition="outside")
+    fig.update_layout(showlegend=False)
+    return _apply_chart_theme(fig)
+
+
+def build_baseline_response_barplot(subjects_by_response: pd.DataFrame):
+    plot_data = subjects_by_response.copy()
+    plot_data["response_label"] = plot_data["response"].map(RESPONSE_LABELS)
+
+    fig = px.bar(
+        plot_data,
+        x="response_label",
+        y="subject_count",
+        text="subject_count",
+        labels={"response_label": "Response", "subject_count": "Subject count"},
+        title="Baseline subjects by response",
+        color="response_label",
+        color_discrete_map={
+            RESPONSE_LABELS["yes"]: RESPONSE_COLORS["yes"],
+            RESPONSE_LABELS["no"]: RESPONSE_COLORS["no"],
+        },
+    )
+    fig.update_traces(textposition="outside")
+    fig.update_layout(showlegend=False)
+    return _apply_chart_theme(fig)
+
+
+def build_baseline_sex_barplot(subjects_by_sex: pd.DataFrame):
+    fig = px.bar(
+        subjects_by_sex,
+        x="sex",
+        y="subject_count",
+        text="subject_count",
+        labels={"sex": "Sex", "subject_count": "Subject count"},
+        title="Baseline subjects by sex",
+        color="sex",
+        color_discrete_map=SEX_COLORS,
+    )
+    fig.update_traces(textposition="outside")
+    fig.update_layout(showlegend=False)
+    return _apply_chart_theme(fig)
+
+
+def build_baseline_male_b_cells_by_response(baseline: pd.DataFrame):
+    male_baseline = baseline[baseline["sex"] == "M"].copy()
+    plot_data = (
+        male_baseline.groupby("response", observed=True)["b_cell"]
+        .mean()
+        .reindex(["yes", "no"])
+        .reset_index()
+    )
+    plot_data["response_label"] = plot_data["response"].map(RESPONSE_LABELS)
+
+    fig = px.bar(
+        plot_data,
+        x="response_label",
+        y="b_cell",
+        text=plot_data["b_cell"].map(lambda value: f"{value:.2f}"),
+        labels={"response_label": "Response", "b_cell": "Mean B cell count"},
+        title="Mean B cell count at baseline (melanoma males)",
+        color="response_label",
+        color_discrete_map={
+            RESPONSE_LABELS["yes"]: RESPONSE_COLORS["yes"],
+            RESPONSE_LABELS["no"]: RESPONSE_COLORS["no"],
+        },
+    )
+    fig.update_traces(textposition="outside")
+    fig.update_layout(showlegend=False)
+    return _apply_chart_theme(fig)
+
+
+def build_baseline_population_composition(baseline: pd.DataFrame):
+    totals = baseline[POPULATIONS].sum()
+    composition = (totals / totals.sum() * 100).reset_index()
+    composition.columns = ["population", "percentage"]
+    composition = _label_populations(composition)
+
+    fig = px.pie(
+        composition,
+        names="population",
+        values="percentage",
+        title="Baseline cell population composition",
+        color="population",
+        color_discrete_map={
+            POPULATION_LABELS[p]: POPULATION_COLORS[p] for p in POPULATIONS
+        },
+    )
+    return _apply_chart_theme(fig)
 
 
 ## baselines

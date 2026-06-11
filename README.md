@@ -21,7 +21,6 @@ python run_pipeline.py
 streamlit run dashboard.py
 ```
 
-No command-line arguments are required for any script.
 
 ## Outputs
 
@@ -75,7 +74,7 @@ cell-count.csv    # Input data
 outputs/          # Generated tables and plots
 ```
 
-**Why this layout:** `load_data.py` handles only data ingestion so the database can be rebuilt independently. `analysis.py` holds all query and statistics logic in one place, shared by both the batch pipeline and the dashboard — avoiding duplicated analysis code. `run_pipeline.py` is a thin orchestrator that calls the output writers in sequence, keeping `make pipeline` simple and predictable. `dashboard.py` is a presentation layer on top of the same functions, so interactive and batch results always stay in sync.
+**Layout reasoning:** `load_data.py` handles only data ingestion so the database can be rebuilt independently. `analysis.py` holds all query and statistics logic in one place, shared by both the batch pipeline and the dashboard — avoiding duplicated analysis code. `run_pipeline.py` is a thin orchestrator that calls the output writers in sequence, keeping `make pipeline` simple and predictable. `dashboard.py` is a presentation layer on top of the same functions, so interactive and batch results always stay in sync.
 
 ## Methodology
 
@@ -90,3 +89,16 @@ Start with `make dashboard`, then open **http://localhost:8501**. The dashboard 
 1. **Part 2: Data Overview** — summary table of cell population relative frequencies
 2. **Part 3: Responder Analysis** — boxplot and statistical test results
 3. **Part 4: Baseline Subset** — baseline sample counts and average B cells for melanoma male responders
+
+Some sample figures include:
+#### Part 2: Data Overview
+
+![Part 2 data overview](figures/part2.png)
+
+#### Part 3: Responder Analysis
+
+![Part 3 responder analysis](figures/part3.png)
+
+#### Part 4: Baseline Subset Analysis
+
+![Part 4 baseline subset analysis](figures/part4.png)
