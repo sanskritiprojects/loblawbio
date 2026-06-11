@@ -11,6 +11,7 @@ from analysis import (
     compare_responders_vs_nonresponders,
     get_baseline_miraclib_melanoma_pbmc_samples,
     get_baseline_subset_counts,
+    get_average_b_cells_melanoma_male_responders_baseline,
 )
 
 
@@ -111,3 +112,7 @@ with tab3:
     with col3:
         st.subheader("Subjects by sex")
         st.dataframe(subjects_by_sex, use_container_width=True)
+
+    avg_b_cells = get_average_b_cells_melanoma_male_responders_baseline()
+    st.subheader("Melanoma males: average B cells at baseline (responders)")
+    st.metric("Average B cell count", f"{avg_b_cells:.2f}")

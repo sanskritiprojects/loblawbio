@@ -1,7 +1,6 @@
 # loblawbio
 
 ## To run
-You
 #### manually
 pip install -r requirements.txt
 python load_data.py
@@ -29,3 +28,5 @@ Responder and non-responder relative frequencies were compared separately for ea
 ## Scaling up
 
 For hundreds of projects, thousands of samples, and more complex analytics, the schema could be normalized into multiple related tables :)
+
+Currently using a denormalized table, which works for this, but would be good to normalize at scale.

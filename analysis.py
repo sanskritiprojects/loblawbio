@@ -174,3 +174,43 @@ def get_baseline_subset_counts():
     )
 
     return samples_by_project, subjects_by_response, subjects_by_sex
+
+
+def get_average_b_cells_melanoma_male_responders_baseline() -> float:
+    """Average B cell count for melanoma male responders at baseline (time=0)."""
+    baseline = get_baseline_miraclib_melanoma_pbmc_samples()
+    subset = baseline[(baseline["sex"] == "M") & (baseline["response"] == "yes")]
+
+    if subset.empty:
+        return 0.0
+
+    return round(subset["b_cell"].mean(), 2)
+
+
+def write_part4_outputs(output_dir: Path = ROOT / "outputs") -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    samples_by_project, subjects_by_response, subjects_by_sex = get_baseline_subset_counts()
+    avg_b_cells = get_average_b_cells_melanoma_male_responders_baseline()
+
+    samples_by_project.to_csv(output_dir / "baseline_samples_by_project.csv", index=False)
+    subjects_by_response.to_csv(output_dir / "baseline_subjects_by_response.csv", index=False)
+    subjects_by_sex.to_csv(output_dir / "baseline_subjects_by_sex.csv", index=False)
+
+    pd.DataFrame(
+        [{"average_b_cells_melanoma_male_responders_baseline": avg_b_cells}]
+    ).to_csv(
+        output_dir / "average_b_cells_melanoma_male_responders_baseline.csv",
+        index=False,
+    )
+
+    print(f"Wrote Part 4 outputs to: {output_dir}")
+    print(f"Average B cells (melanoma, male, responder, baseline): {avg_b_cells:.2f}")
+
+
+def main() -> None:
+    write_part4_outputs()
+
+
+if __name__ == "__main__":
+    main()
